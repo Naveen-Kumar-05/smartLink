@@ -1,0 +1,141 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  plan      Plan     @default(FREE)
+  apiKey    String?  @unique @default(cuid())
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  urls        Url[]
+  campaigns   Campaign[]
+  bioPages    BioPage[]
+  qrCodes     QRCodeAsset[]
+
+  @@map("users")
+}
+
+model Url {
+  id          String    @id @default(uuid())
+  userId      String?
+  campaignId  String?
+  originalUrl String    @db.Text
+  shortCode   String    @unique
+  customAlias String?   @unique
+  title       String?
+  tags        String[]  @default([])
+  clicks      Int       @default(0)
+  qrCode      String?   @db.Text
+  expiryDate  DateTime?
+  isExpired   Boolean   @default(false)
+  lastClickAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  visits   Visit[]
+  qrAssets QRCodeAsset[]
+
+  @@index([shortCode])
+  @@index([userId])
+  @@index([campaignId])
+  @@index([createdAt])
+  @@index([clicks])
+  @@map("urls")
+}
+
+model Visit {
+  id              String   @id @default(uuid())
+  urlId           String
+  timestamp       DateTime @default(now())
+  browser         String?
+  device          String?
+  operatingSystem String?
+  referrer        String?
+  country         String?
+  city            String?
+  ipAddress       String?
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+  @@index([timestamp])
+  @@map("visits")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  urls Url[]
+
+  @@index([userId])
+  @@map("campaigns")
+}
+
+model BioPage {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  slug        String   @unique
+  title       String?
+  description String?
+  avatarUrl   String?
+  theme       String   @default("default")
+  isPublic    Boolean  @default(true)
+  socialLinks Json     @default("[]")
+  blocks      Json     @default("[]")
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([slug])
+  @@map("bio_pages")
+}
+
+model QRCodeAsset {
+  id              String   @id @default(uuid())
+  urlId           String
+  userId          String
+  format          String   @default("png")
+  foregroundColor String   @default("#000000")
+  backgroundColor String   @default("#ffffff")
+  size            Int      @default(256)
+  hasLogo         Boolean  @default(false)
+  dataUrl         String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  url  Url  @relation(fields: [urlId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([urlId])
+  @@index([userId])
+  @@map("qr_code_assets")
+}
